@@ -6,11 +6,12 @@
  * Author: reed
  */
 
-#include <iostream>
-#include <fstream>
-#include <string>
 #include <unistd.h>
-#include <stdio.h>
+#include <cstdio>
+#include <fstream>
+#include <iostream>
+#include <queue>
+#include <string>
 
 using std::ifstream;
 using std::string;
@@ -18,6 +19,9 @@ using std::cout;
 using std::endl;
 using std::getline;
 using std::stoi;
+using std::queue;
+
+const int WINDOW_SIZE = 3;
 
 // Open depths input file and check validity
 void openDepthsFile(ifstream &depthsFile) {
@@ -31,9 +35,28 @@ void validateDepthsFile(ifstream &depthsFile) {
 	}
 }
 
-void initializePrevDepth(ifstream &depthsFile, string &prevLine, int &prevDepth) {
-	getline(depthsFile, prevLine);
-	prevDepth = stoi(prevLine);
+// return the sum of the first 3 window depths
+int initializeFirstWindow(queue<int>& slidingWindow, ifstream &depthsFile, string &currLine) {
+	int sum = 0;
+	while (slidingWindow.size() < WINDOW_SIZE && getline(depthsFile, currLine)) {
+		int newDepth = stoi(currLine);
+		slidingWindow.push(newDepth);
+		sum += newDepth;
+	}
+	return sum;
+}
+
+void slideWindow(int newDepth, queue<int> &slidingWindow) {
+	slidingWindow.pop();
+	slidingWindow.push(newDepth);
+}
+
+int calculateNewWindowSum(int prevWindowSum, int oldDepth, int newDepth) {
+	return prevWindowSum - oldDepth + newDepth;
+}
+
+bool increaseDetected(int currWindowSum, int prevWindowSum) {
+	return currWindowSum > prevWindowSum;
 }
 
 int main() {
@@ -44,27 +67,31 @@ int main() {
 	validateDepthsFile(depthsFile);
 
 	// Vars for depths comparisons
-	string prevLine;
 	string currLine;
-	int prevDepth;
-	int currDepth;
+	int prevWindowSum = 0;
+	int currWindowSum = 0;
+	queue<int> slidingWindow;
 
-	initializePrevDepth(depthsFile, prevLine, prevDepth);
+	prevWindowSum = initializeFirstWindow(slidingWindow, depthsFile, currLine);
 
 	// Calculate depth increases
 	int numIncreases = 0;
 	while (getline(depthsFile, currLine)) {
+		int newDepth = stoi(currLine);
+		int oldDepth = slidingWindow.front();
+		slideWindow(newDepth, slidingWindow);
 
-		currDepth = stoi(currLine);
+		currWindowSum = calculateNewWindowSum(prevWindowSum, oldDepth,
+				newDepth);
 
-		if (currDepth > prevDepth) {
-			numIncreases++;
+		if (increaseDetected(currWindowSum, prevWindowSum)) {
+			++numIncreases;
 		}
 
-		prevDepth = currDepth;
+		prevWindowSum = currWindowSum;
 	}
 
-	cout << "The depth increased " << numIncreases << " times.";
+	cout << "The sliding window depth increased " << numIncreases << " times.";
 }
 
 
